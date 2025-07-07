@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Sentimen - Alun-Alun Wonosobo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-blue: #2563eb;
+            --light-blue: #e3f0ff;
+            --dark-blue: #1e3a8a;
+            --accent-blue: #38bdf8;
+        }
+        /* Seluruh CSS dari template user */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 0; }
+        .container {
+            width: 100vw;
+            max-width: 900px;
+            min-width: 0;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin: 32px auto 32px auto;
+        }
+        .header {
+            background: linear-gradient(90deg, var(--primary-blue) 0%, var(--dark-blue) 100%);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+            position: relative;
+            border-radius: 20px 20px 0 0;
+        }
+        .header h1 { font-size: 2.2rem; margin-bottom: 5px; font-weight: 700; }
+        .location { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 1.1rem; opacity: 0.9; }
+        .content { padding: 0 32px 32px 32px; }
+        .section-title { font-size: 1.4rem; color: #2c3e50; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .section-title i { color: var(--primary-blue); }
+        .examples {
+            background: var(--light-blue);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--primary-blue);
+        }
+        .examples p { margin-bottom: 15px; color: #555; font-size: 1.05rem; }
+        .example-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px; }
+        .example-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 15px;
+            border: 1.5px solid var(--light-blue);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 6px rgba(37,99,235,0.05);
+        }
+        .example-card:hover, .example-card:focus {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 5px 15px rgba(37,99,235,0.15);
+            border-color: var(--accent-blue);
+            outline: 2px solid var(--accent-blue);
+            background: var(--light-blue);
+        }
+        .example-card .text { font-size: 0.95rem; color: #333; margin-bottom: 5px; }
+        .example-card .hint { font-size: 0.8rem; color: var(--primary-blue); font-weight: 500; }
+        .input-section { margin-bottom: 25px; }
+        .comment-input { width: 100%; min-height: 120px; max-height: 300px; padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 1rem; resize: vertical; transition: border-color 0.3s, background 0.3s; background: #fff; }
+        .comment-input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); background: var(--light-blue); }
+        .comment-input::placeholder { color: #aaa; }
+        .analyze-btn {
+            background: linear-gradient(90deg, var(--primary-blue), var(--dark-blue));
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto 0;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.13);
+            position: relative;
+        }
+        .analyze-btn:hover, .analyze-btn:focus {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 6px 15px rgba(56, 189, 248, 0.25);
+            background: linear-gradient(90deg, var(--accent-blue), var(--primary-blue));
+            outline: 2px solid var(--accent-blue);
+        }
+        .analyze-btn:active { transform: translateY(0); }
+        .analyze-btn[disabled], .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .result-section {
+            background: var(--light-blue);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 40px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.07);
+        }
+        .result-title { font-size: 1.5rem; color: #2c3e50; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .sentiment-visual { width: 150px; height: 150px; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 4.5rem; transition: all 0.5s ease; }
+        .positive { background: rgba(46, 204, 113, 0.15); color: #27ae60; }
+        .negative { background: rgba(231, 76, 60, 0.15); color: #c0392b; }
+        .neutral { background: rgba(56, 189, 248, 0.15); color: var(--primary-blue); }
+        .sentiment-text { font-size: 1.8rem; font-weight: 700; margin-bottom: 10px; color: #2c3e50; }
+        .confidence { font-size: 1.1rem; color: #555; margin-bottom: 20px; }
+        .keywords { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; justify-content: center; }
+        .keyword {
+            background: var(--accent-blue);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(56,189,248,0.08);
+        }
+        .error-message { background: #ffebee; color: #c0392b; border: 1px solid #e57373; border-radius: 8px; padding: 12px; margin-bottom: 18px; text-align: center; font-size: 1rem; display: flex; align-items: center; gap: 8px; justify-content: center; }
+        .error-message i { font-size: 1.2rem; }
+        .tooltip { position: relative; display: inline-block; cursor: pointer; }
+        .tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 8px 0; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 0.95rem; }
+        .tooltip:hover .tooltiptext, .tooltip:focus .tooltiptext { visibility: visible; opacity: 1; }
+        .fade-in { animation: fadeIn 0.7s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            background: var(--light-blue);
+            border-top: 1px solid #eee;
+            margin-top: 32px;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+        }
+        @media (max-width: 900px) {
+            .container { max-width: 100vw; border-radius: 0; margin: 0; }
+            .header { border-radius: 0; }
+        }
+        @media (max-width: 800px) {
+            .content { padding: 0 12px 24px 12px; }
+            .examples { padding: 12px; }
+            .result-section { padding: 12px; }
+        }
+        @media (max-width: 700px) {
+            .example-cards { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 500px) {
+            .container { width: 100vw; border-radius: 0; margin: 0; box-shadow: none; }
+            .header h1 { font-size: 1.1rem; }
+            .content { padding: 0 4px 12px 4px; }
+            .section-title { font-size: 0.95rem; }
+            .comment-input { min-height: 60px; font-size: 0.9rem; }
+            .analyze-btn { font-size: 0.9rem; padding: 7px 8px; }
+            .example-cards { grid-template-columns: 1fr; gap: 8px; }
+            .sentiment-visual { width: 70px; height: 70px; font-size: 1.5rem; }
+            .sentiment-text { font-size: 1rem; }
+            .examples, .result-section { padding: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> Analisis Sentimen</h1>
+            <div class="location">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>Alun-Alun Wonosobo, Jawa Tengah</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="examples">
+                <h2 class="section-title"><i class="fas fa-lightbulb"></i> Contoh Ulasan</h2>
+                <p>Klik salah satu contoh di bawah untuk mencoba:</p>
+                <div class="example-cards">
+                    <div class="example-card" onclick="setExample(this)">
+                        <div class="text">Tempatnya sangat nyaman dan bersih.</div>
+                        <div class="hint">Sentimen: Positif</div>
+                    </div>
+                    <div class="example-card" onclick="setExample(this)">
+                        <div class="text">Tempatnya kotor dan sampah berserakan</div>
+                        <div class="hint">Sentimen: Negatif</div>
+                    </div>
+                    <div class="example-card" onclick="setExample(this)">
+                        <div class="text">alun alun wonosobo ada di tengah kota</div>
+                        <div class="hint">Sentimen: Netral</div>
+                    </div>
+                    <div class="example-card" onclick="setExample(this)">
+                        <div class="text">Pemandangan indah, cocok untuk keluarga.</div>
+                        <div class="hint">Sentimen: Positif</div>
+                    </div>
+                </div>
+            </div>
+            <div class="input-section">
+                <h2 class="section-title"><i class="fas fa-comment-dots"></i> Masukkan Komentar</h2>
+                <form method="post" id="analyzeForm" autocomplete="off" onsubmit="return handleAnalyze(event)">
+                    <textarea class="comment-input" id="commentInput" name="teks" placeholder="Tulis ulasan Anda tentang Alun-Alun Wonosobo...">{{ request.form.teks if request.method=='POST' else '' }}</textarea>
+                    <button class="analyze-btn" id="analyzeBtn" type="submit">
+                        <span id="analyzeBtnText"><i class="fas fa-search"></i> Analisis Sentimen</span>
+                        <span id="analyzeBtnLoading" style="display:none"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</span>
+                    </button>
+                </form>
+            </div>
+            <div style="text-align:center; margin: 24px 0;">
+                <a href="/wordcloud" target="_blank" class="analyze-btn" style="display:inline-block; width:auto;">
+                    <i class="fas fa-cloud"></i> Lihat Word Cloud
+                </a>
+                <a href="/frekuensi" target="_blank" class="analyze-btn" style="display:inline-block; width:auto; margin-top:8px;">
+                    <i class="fas fa-chart-bar"></i> Lihat Frekuensi Kata
+                </a>
+            </div>
+            <div class="result-section fade-in" id="resultSection" {% if not hasil %}style="display:none;"{% endif %}>
+                {% if hasil %}
+                <h2 class="result-title">
+                    <i class="fas fa-chart-pie"></i> Hasil Analisis
+                    <span class="tooltip"><i class="fas fa-info-circle"></i>
+                        <span class="tooltiptext">Hasil analisis sentimen berdasarkan model Machine Learning.<br>Kata kunci: kata yang paling berpengaruh.</span>
+                    </span>
+                </h2>
+                <div class="sentiment-visual {% if hasil.lower() == 'positif' %}positive{% elif hasil.lower() == 'negatif' %}negative{% else %}neutral{% endif %}">
+                    {% if hasil.lower() == 'positif' %}
+                        <i class="fas fa-smile"></i>
+                    {% elif hasil.lower() == 'negatif' %}
+                        <i class="fas fa-frown"></i>
+                    {% else %}
+                        <i class="fas fa-meh"></i>
+                    {% endif %}
+                </div>
+                <div class="sentiment-text">{{ hasil }}</div>
+                {% if keywords %}
+                <div class="keywords">
+                    {% for kata in keywords %}
+                        <span class="keyword">{{ kata }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+                {% if error %}
+                <div class="error-message"><i class="fas fa-exclamation-triangle"></i> {{ error }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="footer">
+            <p>© 2025 Analisis Sentimen Alun-Alun Wonosobo | Jawa Tengah</p>
+        </div>
+    </div>
+    <script>
+        function setExample(element) {
+            const text = element.querySelector('.text').textContent;
+            document.getElementById('commentInput').value = text;
+            element.style.backgroundColor = '#e3f2fd';
+            element.style.borderColor = '#3498db';
+            setTimeout(() => {
+                element.style.backgroundColor = '';
+                element.style.borderColor = '';
+            }, 1000);
+        }
+
+        // UX: Loading, disable button, auto scroll, fade in
+        function handleAnalyze(e) {
+            const btn = document.getElementById('analyzeBtn');
+            const btnText = document.getElementById('analyzeBtnText');
+            const btnLoading = document.getElementById('analyzeBtnLoading');
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoading.style.display = 'inline-block';
+            setTimeout(() => {
+                btn.disabled = false;
+                btnText.style.display = 'inline-block';
+                btnLoading.style.display = 'none';
+            }, 4000); // fallback jika server lambat
+            // Setelah submit, scroll ke hasil
+            setTimeout(() => {
+                const result = document.getElementById('resultSection');
+                if(result) result.scrollIntoView({behavior: 'smooth'});
+            }, 1000);
+            return true; // lanjutkan submit
+        }
+        // Auto scroll ke hasil jika sudah ada hasil (misal reload)
+        window.onload = function() {
+            const result = document.getElementById('resultSection');
+            if(result && result.style.display !== 'none') {
+                setTimeout(() => { result.scrollIntoView({behavior: 'smooth'}); }, 500);
+            }
+        }
+    </script>
+</body>
+</html> 
