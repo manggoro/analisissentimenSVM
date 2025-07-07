@@ -10,6 +10,7 @@ import pandas as pd
 import nltk
 from nltk.corpus import stopwords
 from collections import Counter
+import seaborn as sns
 
 # Load vectorizer dan model
 with open('tfidf_vectorizer (2).pkl', 'rb') as f:
@@ -106,6 +107,35 @@ def frekuensi():
     plt.xticks(rotation=45)
     for bar, num in zip(bars, count):
         plt.text(bar.get_x() + bar.get_width() / 2, num + 1, str(num), ha='center', color='black', fontsize=10)
+    plt.tight_layout()
+    plt.savefig(img, format='png')
+    plt.close()
+    img.seek(0)
+    return send_file(img, mimetype='image/png')
+
+@app.route('/labeling')
+def labeling():
+    df = pd.read_csv('sentiment.csv')
+    sentiment_count = df['Sentiment'].value_counts().reset_index()
+    sentiment_count.columns = ['Sentiment', 'Count']
+    sns.set_style('whitegrid')
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax = sns.barplot(
+        data=sentiment_count,
+        x='Sentiment',
+        y='Count',
+        hue='Sentiment',
+        palette='pastel',
+        legend=False
+    )
+    plt.title('Jumlah Sentiment\nMetode inSet Lexicon Based\n', fontsize=14, pad=20)
+    plt.xlabel('\nClass Sentiment', fontsize=12)
+    plt.ylabel('Jumlah Tweet', fontsize=12)
+    total = sentiment_count['Count'].sum()
+    for i, row in sentiment_count.iterrows():
+        percentage = f'{100 * row["Count"] / total:.2f}%'
+        ax.text(i, row["Count"] + 0.10, f'{row["Count"]}\n({percentage})', ha='center', va='bottom')
+    img = io.BytesIO()
     plt.tight_layout()
     plt.savefig(img, format='png')
     plt.close()
