@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analisis Sentimen - Alun-Alun Wonosobo</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="/static/logo.png">
     <style>
         :root {
             --primary-blue: #2563eb;
@@ -70,6 +71,9 @@
         .comment-input { width: 100%; min-height: 120px; max-height: 300px; padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 1rem; resize: vertical; transition: border-color 0.3s, background 0.3s; background: #fff; }
         .comment-input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); background: var(--light-blue); }
         .comment-input::placeholder { color: #aaa; }
+        .analyze-btn, .analyze-btn:visited, .analyze-btn:active, .analyze-btn:hover, .analyze-btn:focus {
+            text-decoration: none !important;
+        }
         .analyze-btn {
             background: linear-gradient(90deg, var(--primary-blue), var(--dark-blue));
             color: white;
@@ -165,7 +169,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1><i class="fas fa-chart-line"></i> Analisis Sentimen</h1>
+    <h1>Analisis Sentimen</h1>
             <div class="location">
                 <i class="fas fa-map-marker-alt"></i>
                 <span>Alun-Alun Wonosobo, Jawa Tengah</span>
@@ -199,7 +203,7 @@
                         <span id="analyzeBtnText"><i class="fas fa-search"></i> Analisis Sentimen</span>
                         <span id="analyzeBtnLoading" style="display:none"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</span>
                     </button>
-                </form>
+    </form>
             </div>
             <div style="text-align:center; margin: 24px 0;">
                 <a href="/wordcloud" target="_blank" class="analyze-btn" style="display:inline-block; width:auto;">
@@ -213,7 +217,7 @@
                 </a>
             </div>
             <div class="result-section fade-in" id="resultSection" {% if not hasil %}style="display:none;"{% endif %}>
-                {% if hasil %}
+    {% if hasil %}
                 <h2 class="result-title">
                     <i class="fas fa-chart-pie"></i> Hasil Analisis
                     <span class="tooltip"><i class="fas fa-info-circle"></i>
@@ -240,7 +244,7 @@
                 {% endif %}
                 {% if error %}
                 <div class="error-message"><i class="fas fa-exclamation-triangle"></i> {{ error }}</div>
-                {% endif %}
+    {% endif %}
             </div>
         </div>
         <div class="footer">
@@ -288,4 +292,4 @@
         }
     </script>
 </body>
-</html> 
+</html>
