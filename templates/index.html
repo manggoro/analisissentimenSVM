@@ -173,6 +173,40 @@
             background: #60a5fa !important;
             outline: 2px solid #60a5fa !important;
         }
+        .upload-section {
+            background: var(--light-blue);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--primary-blue);
+            box-shadow: 0 2px 8px rgba(37,99,235,0.07);
+        }
+        .upload-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .upload-input {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #fff;
+            transition: border-color 0.3s;
+        }
+        .upload-input:focus {
+            border-color: var(--primary-blue);
+            outline: none;
+        }
+        .upload-hint {
+            font-size: 0.95rem;
+            color: #555;
+            margin-top: 8px;
+            margin-left: 2px;
+        }
+        .flashes { margin-bottom: 18px; }
     </style>
 </head>
 <body>
@@ -185,6 +219,15 @@
             </div>
         </div>
         <div class="content">
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="flashes">
+                  {% for message in messages %}
+                    <div class="error-message"><i class="fas fa-info-circle"></i> {{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
             <div class="examples">
                 <h2 class="section-title"><i class="fas fa-lightbulb"></i> Contoh Ulasan</h2>
                 <p>Klik salah satu contoh di bawah untuk mencoba:</p>
@@ -255,6 +298,16 @@
                 {% if error %}
                 <div class="error-message"><i class="fas fa-exclamation-triangle"></i> {{ error }}</div>
     {% endif %}
+            </div>
+            <div class="upload-section">
+                <h2 class="section-title"><i class="fas fa-upload"></i> Upload Dataset Komentar</h2>
+                <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                    <input type="file" name="file" accept=".csv" required class="upload-input">
+                    <button type="submit" class="analyze-btn btn-secondary" style="margin-left: 10px;">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Dataset
+                    </button>
+                </form>
+                <div class="upload-hint">Format file: <b>CSV</b> dengan kolom <b>komentar</b> (dan <b>waktu</b> jika ada).</div>
             </div>
         </div>
         <div class="footer">
