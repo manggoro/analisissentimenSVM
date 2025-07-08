@@ -207,6 +207,128 @@
             margin-left: 2px;
         }
         .flashes { margin-bottom: 18px; }
+        .loader {
+            border: 8px solid #e3f0ff;
+            border-top: 8px solid #2563eb;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+        }
+        .progress-bar-bg {
+            width: 100%;
+            background: #e3f0ff;
+            border-radius: 8px;
+            height: 18px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(37,99,235,0.08);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2563eb, #38bdf8);
+            border-radius: 8px 0 0 8px;
+            transition: width 0.4s;
+        }
+        .comparison-table-container {
+            background: #f8fbff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+            padding: 18px 12px 24px 12px;
+            margin-top: 18px;
+            margin-bottom: 32px;
+            overflow-x: auto;
+        }
+        .comparison-table-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 12px;
+            text-align: left;
+            letter-spacing: 0.01em;
+        }
+        .table-striped {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(37,99,235,0.07);
+        }
+        .table-striped th, .table-striped td {
+            padding: 12px 10px;
+            border: 1px solid #e3f0ff;
+            text-align: left;
+            font-size: 1rem;
+            vertical-align: top;
+            word-break: break-word;
+        }
+        .table-striped th {
+            background: #e3f0ff;
+            color: #2563eb;
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+        .table-striped tr:nth-child(even) td {
+            background: #f4f8ff;
+        }
+        .table-striped tr:hover td {
+            background: #e0edff;
+        }
+        @media (max-width: 700px) {
+            .table-striped th, .table-striped td { font-size: 0.92rem; padding: 8px 5px; }
+            .comparison-table-title { font-size: 1.05rem; }
+        }
+        .wc-freq-container {
+            background: #f8fbff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+            padding: 18px 12px 24px 12px;
+            margin-top: 18px;
+            margin-bottom: 32px;
+            overflow-x: auto;
+            text-align: center;
+        }
+        .wc-freq-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 10px;
+            margin-top: 8px;
+            text-align: center;
+            letter-spacing: 0.01em;
+        }
+        .wc-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(37,99,235,0.07);
+            margin-bottom: 8px;
+            margin-top: 2px;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-top: 18px;
+            font-size: 1.08rem;
+            padding: 12px 28px;
+            border-radius: 30px;
+            background: linear-gradient(90deg, #2563eb, #38bdf8);
+            color: #fff !important;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.10);
+            transition: all 0.2s;
+        }
+        .download-btn:hover, .download-btn:focus {
+            background: linear-gradient(90deg, #38bdf8, #2563eb);
+            color: #fff !important;
+            outline: 2px solid #38bdf8;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -301,14 +423,30 @@
             </div>
             <div class="upload-section">
                 <h2 class="section-title"><i class="fas fa-upload"></i> Upload Dataset Komentar</h2>
-                <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
-                    <input type="file" name="file" accept=".csv" required class="upload-input">
-                    <button type="submit" class="analyze-btn btn-secondary" style="margin-left: 10px;">
+                <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
+                    <input type="file" name="file" accept=".csv" required class="upload-input" id="fileInput">
+                    <button type="submit" class="analyze-btn btn-secondary" style="margin-left: 10px;" id="uploadBtn">
                         <i class="fas fa-cloud-upload-alt"></i> Upload Dataset
                     </button>
                 </form>
+                <div id="uploadProgressBar" style="display:none; width:100%; margin-top:10px;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progressBarFill"></div>
+                    </div>
+                    <div id="progressStepText" style="text-align:center; color:#2563eb; font-size:1rem; margin-top:4px;">
+                        Sedang memproses data, mohon tunggu...
+                    </div>
+                </div>
                 <div class="upload-hint">Format file: <b>CSV</b> dengan kolom <b>komentar</b> (dan <b>waktu</b> jika ada).</div>
+                <div id="uploadNotif" style="display:none; margin-top:10px; color:#27ae60; font-weight:600;"></div>
+                <div id="uploadTable" style="margin-top:18px;"></div>
             </div>
+            {% if table_html %}
+                <h2 style="margin-top:32px;">Perbandingan Data Mentah vs Data Setelah Preprocessing</h2>
+                <div style="overflow-x:auto; margin-bottom:32px;">
+                    {{ table_html|safe }}
+                </div>
+            {% endif %}
         </div>
         <div class="footer">
             <p>© 2025 Analisis Sentimen Alun-Alun Wonosobo | Jawa Tengah</p>
@@ -353,6 +491,69 @@
                 setTimeout(() => { result.scrollIntoView({behavior: 'smooth'}); }, 500);
             }
         }
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+            if (!file) return;
+            var formData = new FormData();
+            formData.append('file', file);
+            document.getElementById('uploadProgressBar').style.display = 'block';
+            document.getElementById('progressBarFill').style.width = '0%';
+            document.getElementById('progressStepText').textContent = 'Mengunggah file...';
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('uploadNotif').style.display = 'none';
+            document.getElementById('uploadTable').innerHTML = '';
+
+            // Mulai SSE untuk progress
+            var evtSource = new EventSource('/progress_stream');
+            evtSource.onmessage = function(event) {
+                var data = JSON.parse(event.data);
+                document.getElementById('progressBarFill').style.width = data.progress + '%';
+                document.getElementById('progressStepText').textContent = data.status;
+                if (data.progress >= 100) {
+                    evtSource.close();
+                }
+            };
+
+            fetch('/upload_ajax', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('uploadBtn').disabled = false;
+                if(data.success) {
+                    document.getElementById('uploadNotif').textContent = data.notif || 'Upload sukses!';
+                    document.getElementById('uploadNotif').style.display = 'block';
+                    if(data.table_html) {
+                        document.getElementById('uploadTable').innerHTML =
+                          '<div class="comparison-table-container">' +
+                          '<div class="comparison-table-title">Perbandingan Data Mentah vs Hasil Normalisasi (10 Data Pertama)</div>' +
+                          data.table_html +
+                          '</div>' +
+                          '<div class="wc-freq-container">' +
+                          '<div class="wc-freq-title"><i class="fas fa-cloud"></i> Wordcloud</div>' +
+                          '<img src="/wordcloud?ts=' + Date.now() + '" alt="Wordcloud" class="wc-img">' +
+                          '<div class="wc-freq-title" style="margin-top:22px;"><i class="fas fa-chart-bar"></i> Frekuensi Kata</div>' +
+                          '<img src="/frekuensi?ts=' + Date.now() + '" alt="Frekuensi Kata" class="wc-img">' +
+                          '<div style="text-align:center; margin-top:28px;">' +
+                          '<a href="/static/data_labelled.csv" download class="analyze-btn btn-secondary download-btn"><i class="fas fa-download"></i> Download Hasil Labeling</a>' +
+                          '</div>' +
+                          '</div>';
+                    }
+                } else if(data.error) {
+                    document.getElementById('uploadNotif').textContent = data.error;
+                    document.getElementById('uploadNotif').style.color = '#c0392b';
+                    document.getElementById('uploadNotif').style.display = 'block';
+                }
+            })
+            .catch(function(err) {
+                alert('Upload gagal: ' + err);
+                document.getElementById('uploadBtn').disabled = false;
+                evtSource.close();
+            });
+        });
     </script>
 </body>
 </html>

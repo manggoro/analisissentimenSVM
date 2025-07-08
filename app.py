@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, send_file, redirect, url_for, flash
+from flask import Flask, request, render_template, send_file, redirect, url_for, flash, Response, jsonify
 import pickle
 import random
 from wordcloud import WordCloud
@@ -17,6 +17,8 @@ import string
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 import csv
 from nltk.tokenize import word_tokenize
+import threading
+import time
 
 # Load vectorizer dan model
 with open('tfidf_vectorizer (2).pkl', 'rb') as f:
@@ -36,6 +38,19 @@ KOMENTAR_SAMPLE = [
     "Fasilitas kurang memadai dan parkir sempit.",
     "Lokasi strategis tapi terlalu ramai di akhir pekan."
 ]
+
+# Variabel global untuk status progress
+progress_status = {'progress': 0, 'status': 'Menunggu upload...'}
+progress_lock = threading.Lock()
+
+def set_progress(progress, status):
+    with progress_lock:
+        progress_status['progress'] = progress
+        progress_status['status'] = status
+
+def get_progress():
+    with progress_lock:
+        return progress_status.copy()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -149,6 +164,20 @@ def labeling():
     img.seek(0)
     return send_file(img, mimetype='image/png')
 
+@app.route('/progress_stream')
+def progress_stream():
+    def event_stream():
+        last_progress = -1
+        while True:
+            prog = get_progress()
+            if prog['progress'] != last_progress:
+                yield f"data: {{\"progress\": {prog['progress']}, \"status\": \"{prog['status']}\"}}\n\n"
+                last_progress = prog['progress']
+            if prog['progress'] >= 100:
+                break
+            time.sleep(0.2)
+    return Response(event_stream(), mimetype='text/event-stream')
+
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
@@ -160,6 +189,7 @@ def upload():
         return redirect(url_for('index'))
     if file and file.filename.endswith('.csv'):
         df = pd.read_csv(file)
+        df_raw = df.copy()  # Simpan data mentah
         # --- PREPROCESSING ---
         # Rename kolom jika ada
         if 'rsqaWe' in df.columns and 'wiI7pd' in df.columns:
@@ -251,16 +281,11 @@ def upload():
             return replaced_text
         df['normalisasi'] = df['case_folding'].apply(lambda x: replace_taboo_words(x, kamus_tidak_baku))
         # --- TOKENIZATION ---
-        # Pastikan resource NLTK 'punkt' sudah tersedia
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')
-        def tokenize_with_nltk(text):
+        def tokenize_with_split(text):
             if isinstance(text, str):
-                return word_tokenize(text)
+                return text.split()
             return []
-        df['tokenize'] = df['normalisasi'].apply(tokenize_with_nltk)
+        df['tokenize'] = df['normalisasi'].apply(tokenize_with_split)
         # --- STOPWORD REMOVAL ---
         nltk.download('stopwords')
         stop_words = stopwords.words('indonesian')
@@ -324,13 +349,221 @@ def upload():
                 sentiment = "Netral"
             return sentiment_score, sentiment
         df[['Score', 'Sentiment']] = df['steming_data'].apply(lambda x: pd.Series(determine_sentiment_advanced(x)))
+        # Gabungkan untuk perbandingan (hanya kolom utama)
+        df_raw_view = df_raw[['komentar']] if 'komentar' in df_raw.columns else df_raw.iloc[:, :1]
+        df_proc_view = df[['case_folding']] if 'case_folding' in df.columns else df
+        comparison_df = pd.concat([df_raw_view.reset_index(drop=True), df_proc_view.reset_index(drop=True)], axis=1)
+        comparison_df.columns = ['Komentar (Mentah)', 'Case Folding']
+        table_html = comparison_df.head(20).to_html(classes='table table-striped', index=False)
         # Simpan hasil akhir
         df.to_csv('data_labelled.csv', index=False, encoding='utf-8-sig')
         flash('Dataset berhasil diupload, diproses, dan dilabeli! Hasil disimpan di data_labelled.csv')
-        return redirect(url_for('index'))
+        return render_template('index.html', table_html=table_html)
     else:
         flash('File harus berformat CSV!')
         return redirect(url_for('index'))
+
+@app.route('/upload_ajax', methods=['POST'])
+def upload_ajax():
+    set_progress(0, 'Mengunggah file...')
+    if 'file' not in request.files:
+        set_progress(100, 'Gagal: Tidak ada file yang diupload')
+        return jsonify({'error': 'Tidak ada file yang diupload'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        set_progress(100, 'Gagal: File belum dipilih')
+        return jsonify({'error': 'File belum dipilih'}), 400
+    if file and file.filename.endswith('.csv'):
+        try:
+            df = pd.read_csv(file)
+            df_raw = df.copy()
+            set_progress(10, 'Cleaning...')
+            # --- PREPROCESSING ---
+            if 'rsqaWe' in df.columns and 'wiI7pd' in df.columns:
+                df = df.rename(columns={'rsqaWe': 'waktu', 'wiI7pd': 'komentar'})
+            if 'waktu' in df.columns and 'komentar' in df.columns:
+                df = pd.DataFrame(df[['waktu','komentar']])
+            elif 'komentar' in df.columns:
+                df = pd.DataFrame(df[['komentar']])
+            else:
+                set_progress(100, 'Gagal: Kolom komentar tidak ditemukan!')
+                return jsonify({'error': 'Kolom komentar tidak ditemukan!'}), 400
+            df = df.dropna(subset=['komentar'])
+            df = df[df['komentar'].str.strip() != '']
+            df = df[df['komentar'].str.split().str.len() > 1]
+            df.drop_duplicates(subset="komentar", keep="first", inplace=True)
+            # --- CLEANING ---
+            def remove_URL(tweet):
+                if tweet is not None and isinstance(tweet,str):
+                    url = re.compile(r'https?://\S+|www\.\S+')
+                    tweet = url.sub(r'',tweet)
+                return tweet
+            def remove_html(tweet):
+                if tweet is not None and isinstance(tweet,str):
+                    html = re.compile(r'<.*?>')
+                    tweet = html.sub(r'',tweet)
+                return tweet
+            def remove_symbols(tweet):
+                if tweet is not None and isinstance(tweet,str):
+                    tweet = re.sub(r'[^a-zA-Z0-9\s]', '', tweet)
+                return tweet
+            def remove_numbers(tweet):
+                if tweet is not None and isinstance(tweet, str):
+                    tweet = re.sub(r'\d', '', tweet)
+                return tweet
+            def remove_emoji(tweet):
+                if tweet is not None and isinstance (tweet, str):
+                    emoji_pattern = re.compile("["
+                        u"\U0001F600-\U0001F64F" # emoticons
+                        u"\U0001F300-\U0001F5FF" # symbols & pictographs
+                        u"\U0001F680-\U0001F6FF" # transport & map symbols
+                        u"\U0001F700-\U0001F77F" # Alchemical symbols
+                        u"\U0001F780-\U0001F7FF" # Geometric Shapes Extended
+                        u"\U0001F800-\U0001F8FF" # Supplemental Arrows-C
+                        u"\U0001F900-\U0001F9FF" # Supplemental Symbols and Pictographs
+                        u"\U0001FA00-\U0001FA6F" # Chess Symbols
+                        u"\U0001FA70-\U0001FAFF" # Symbols and Pictographs Extended-A
+                        u"\U0001F004-\U0001F0CF" # Additional emoticons
+                        u"\U0001F1E0-\U0001F1FF" # flags
+                        "]+", flags=re.UNICODE)
+                    tweet = emoji_pattern.sub(r'', tweet)
+                return tweet
+            df['cleaning'] = df['komentar'].apply(lambda x: remove_URL(x))
+            df['cleaning'] = df['cleaning'].apply(lambda x: remove_html(x))
+            df['cleaning'] = df['cleaning'].apply(lambda x: remove_emoji(x))
+            df['cleaning'] = df['cleaning'].apply(lambda x: remove_symbols(x))
+            df['cleaning'] = df['cleaning'].apply(lambda x: remove_numbers(x))
+            set_progress(25, 'Case Folding...')
+            # --- CASEFOLDING ---
+            def case_folding(text):
+                if isinstance(text, str):
+                    return text.lower()
+                else:
+                    return text
+            df['case_folding'] = df['cleaning'].apply(case_folding)
+            set_progress(35, 'Normalisasi...')
+            # --- NORMALISASI ---
+            kamus_path = 'kamuskatabaku.xlsx'
+            if not os.path.exists(kamus_path):
+                set_progress(100, 'Gagal: File kamuskatabaku.xlsx tidak ditemukan!')
+                return jsonify({'error': 'File kamuskatabaku.xlsx tidak ditemukan!'}), 400
+            kamus_data = pd.read_excel(kamus_path)
+            kamus_tidak_baku = dict(zip(kamus_data['tidak_baku'], kamus_data['kata_baku']))
+            def replace_taboo_words(text, kamus_tidak_baku):
+                if isinstance(text, str):
+                    words = text.split()
+                    replaced_words = []
+                    for word in words:
+                        if word in kamus_tidak_baku:
+                            baku_word = kamus_tidak_baku[word]
+                            if isinstance(baku_word, str) and all(char.isalpha() for char in baku_word):
+                                replaced_words.append(baku_word)
+                            else:
+                                replaced_words.append(word)
+                        else:
+                            replaced_words.append(word)
+                    replaced_text = ' '.join(replaced_words)
+                else:
+                    replaced_text = ''
+                return replaced_text
+            df['normalisasi'] = df['case_folding'].apply(lambda x: replace_taboo_words(x, kamus_tidak_baku))
+            set_progress(45, 'Tokenisasi...')
+            # --- TOKENIZATION ---
+            def tokenize_with_split(text):
+                if isinstance(text, str):
+                    return text.split()
+                return []
+            df['tokenize'] = df['normalisasi'].apply(tokenize_with_split)
+            set_progress(55, 'Stopword Removal...')
+            # --- STOPWORD REMOVAL ---
+            nltk.download('stopwords')
+            stop_words = stopwords.words('indonesian')
+            def remove_stopwords(tokens):
+                return [word for word in tokens if word not in stop_words]
+            df['stopword_removal'] = df['tokenize'].apply(remove_stopwords)
+            set_progress(65, 'Stemming...')
+            # --- STEMMING ---
+            factory = StemmerFactory()
+            stemmer = factory.create_stemmer()
+            def stem_text(text):
+                if isinstance(text, list):
+                    text = ' '.join(text)
+                return stemmer.stem(text)
+            df['steming_data'] = df['stopword_removal'].apply(stem_text)
+            df = df[~(df['steming_data'].isna() | (df['steming_data'].str.strip() == ''))]
+            set_progress(80, 'Labeling...')
+            # --- LABELING ---
+            lexicon_pos_path = 'lexicon_positive.csv'
+            lexicon_neg_path = 'lexicon_negative.csv'
+            if not os.path.exists(lexicon_pos_path) or not os.path.exists(lexicon_neg_path):
+                set_progress(100, 'Gagal: File lexicon_positive.csv atau lexicon_negative.csv tidak ditemukan!')
+                return jsonify({'error': 'File lexicon_positive.csv atau lexicon_negative.csv tidak ditemukan!'}), 400
+            lexicon_positive = dict()
+            with open(lexicon_pos_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile, delimiter=',')
+                for row in reader:
+                    lexicon_positive[row[0]] = int(row[1])
+            lexicon_negative = dict()
+            with open(lexicon_neg_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile, delimiter=',')
+                for row in reader:
+                    lexicon_negative[row[0]] = int(row[1])
+            negasi_words = ['tidak', 'bukan', 'nggak', 'ga', 'gak', 'belum', 'jangan']
+            def determine_sentiment_advanced(text):
+                if not isinstance(text, str):
+                    return 0, "Netral"
+                words = text.split()
+                sentiment_score = 0
+                i = 0
+                while i < len(words):
+                    word = words[i]
+                    if word in negasi_words and i + 1 < len(words):
+                        next_word = words[i + 1]
+                        if next_word in lexicon_positive:
+                            sentiment_score -= lexicon_positive[next_word]
+                            i += 2
+                            continue
+                        elif next_word in lexicon_negative:
+                            sentiment_score += abs(lexicon_negative[next_word])
+                            i += 2
+                            continue
+                    if word in lexicon_positive:
+                        sentiment_score += lexicon_positive[word]
+                    elif word in lexicon_negative:
+                        sentiment_score += lexicon_negative[word]
+                    i += 1
+                if sentiment_score > 0:
+                    sentiment = "Positif"
+                elif sentiment_score < 0:
+                    sentiment = "Negatif"
+                else:
+                    sentiment = "Netral"
+                return sentiment_score, sentiment
+            df[['Score', 'Sentiment']] = df['steming_data'].apply(lambda x: pd.Series(determine_sentiment_advanced(x)))
+            set_progress(95, 'Menyimpan hasil...')
+            # Gabungkan untuk perbandingan (hanya kolom utama: komentar & normalisasi)
+            if 'komentar' in df.columns:
+                df_raw_view = df[['komentar']]
+            elif 'wiI7pd' in df.columns:
+                df_raw_view = df[['wiI7pd']]
+                df_raw_view.columns = ['komentar']
+            else:
+                set_progress(100, 'Gagal: Kolom komentar (atau wiI7pd) tidak ditemukan setelah preprocessing!')
+                return jsonify({'error': 'Kolom komentar (atau wiI7pd) tidak ditemukan setelah preprocessing!', 'table_html': ''}), 400
+            df_proc_view = df[['normalisasi']] if 'normalisasi' in df.columns else df
+            comparison_df = pd.concat([df_raw_view.reset_index(drop=True), df_proc_view.reset_index(drop=True)], axis=1)
+            comparison_df.columns = ['Komentar (Mentah)', 'Normalisasi']
+            table_html = comparison_df.head(10).to_html(classes='table table-striped', index=False)
+            print('DEBUG TABLE_HTML:', table_html[:200])  # log awal tabel
+            df.to_csv('data_labelled.csv', index=False, encoding='utf-8-sig')
+            set_progress(100, 'Selesai! Dataset berhasil diupload, diproses, dan dilabeli.')
+            return jsonify({'success': True, 'notif': 'Dataset berhasil diupload, diproses, dan dilabeli!', 'table_html': table_html})
+        except Exception as e:
+            set_progress(100, f'Gagal: {str(e)}')
+            return jsonify({'error': str(e), 'table_html': ''}), 500
+    else:
+        set_progress(100, 'Gagal: File harus berformat CSV!')
+        return jsonify({'error': 'File harus berformat CSV!'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
